@@ -33,10 +33,10 @@ export const createCheckoutSession = async (req, res, next) => {
         mode: "subscription",
         customer_email: req.user.email,
 
-        metadata: { user_id: req.user._id },
+        metadata: { user_id: req.user._id.toString() },
 
         subscription_data: {
-          metadata: { user_id: req.user._id },
+          metadata: { user_id: req.user._id.toString() },
         },
 
         payment_method_types: ["card"],
@@ -54,9 +54,9 @@ export const createCheckoutSession = async (req, res, next) => {
         ],
 
         // success_url: `https://www.eukaai.com/payment-success`,
-        success_url: `http://localhost:3000/payment-success`,
+        success_url: `http://localhost:3000/payment-status`,
         // cancel_url: `https://www.eukaai.com/payment-cancel`,
-        cancel_url: `http://localhost:3000/payment-cancel`,
+        cancel_url: `http://localhost:3000/payment-status`,
       },
       {
         idempotencyKey,
