@@ -16,7 +16,7 @@ export const getFullGuide = async (condition) => {
 }
 
 export const getFullGuides = async (condition,offset,limit) => {
-  return await fullGuide.find(condition).skip(offset).limit(limit).lean();
+  return await fullGuide.find(condition).sort({ createdAt: -1 }).skip(offset).limit(limit).lean();
 }
 
 // count total guides
