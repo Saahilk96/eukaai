@@ -1,16 +1,30 @@
 import quickGuide from "./quickGuide.model.js";
 
-export const createQuickGuide = async (data) => {
+export const createQuickGuide = async (data, options) => {
   const createdQuickGuide = new quickGuide(data);
-  const savedFullGuide = await createdQuickGuide.save();
+  const savedQuickGuide = await createdQuickGuide.save(options);
 
-  return savedFullGuide;
+  return savedQuickGuide;
 };
 
-export const deleteQuickGuide = async (condition) => {
-  return await quickGuide.deleteOne(condition)
-}
+export const deleteQuickGuide = async (condition, option) => {
+  return await quickGuide.deleteOne(condition, option);
+};
 
-export const getQuickGuide = async (condition,offset,limit) => {
-  return await quickGuide.find(condition).skip(offset).limit(limit);
-}
+export const getQuickGuide = async (condition) => {
+  return await quickGuide.findOne(condition);
+};
+
+export const getQuickGuides = async (condition, offset, limit) => {
+  return await quickGuide
+    .find(condition)
+    .sort({ createdAt: -1 })
+    .skip(offset)
+    .limit(limit)
+    .lean();
+};
+
+// count total guides
+export const countQuickGuides = async (filter) => {
+  return await quickGuide.countDocuments(filter);
+};

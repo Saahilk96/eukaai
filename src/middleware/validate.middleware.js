@@ -1,4 +1,9 @@
 export const validateBody = (schema) => (req, res, next) => {
+  if(!req.body)
+    return res
+      .status(400)
+      .json({ message: "error validating data", error: "empty body,body required" });
+
   const { error } = schema.validate(req.body, { abortEarly: false });
   if (error) {
     const allErrors = error.details.map((err) => ({

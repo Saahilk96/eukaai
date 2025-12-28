@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import User from "../user/user.model.js";
 import environmentVariables from "../../config/env.js";
+import { firstUserService } from "../../utils/sendEmail.js";
 
 const isProd = environmentVariables.nodeEnv === "production";
 
@@ -26,8 +27,10 @@ export const login = async (req, res, next) => {
     if (!user) {
       const newUser = await User.create({ email, ...rest });
       user = newUser.toObject(); // convert mongoose doc to plain object
+      firstUserService(req.body.name,req.body.email);
     }
-
+    
+    
     // 3️⃣ Generate tokens using only _id
     const accessToken = generateAccessToken(user._id);
     const refreshToken = generateRefreshToken(user._id);
