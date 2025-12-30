@@ -6,7 +6,6 @@ const authMiddleware = async (req, res, next) => {
   try {
     const token = req.cookies.accessToken;
     if (!token) {
-      console.log(token);
       return res.status(401).json({ message: 'Access token missing' });
     }
 

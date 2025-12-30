@@ -10,7 +10,7 @@ import authMiddleware from "../../middleware/auth.middleware.js";
 const router = express.Router();
 
 router.post("/create-checkout-session", authMiddleware, createCheckoutSession);
-router.post("/stripe-webhook", authMiddleware, stripeWebhook);
+router.post("/stripe-webhook", stripeWebhook);
 router.post("/cancel-subscription", authMiddleware, cancelSubscription);
 router.post("/verify-payment", authMiddleware, verifyPayment);
 

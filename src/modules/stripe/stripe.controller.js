@@ -5,9 +5,15 @@ import User from "../user/user.model.js";
 const stripe = new Stripe(environmentVariables.stripeSecretKey);
 
 const generateIdempotencyKey = (userId) => {
-  const today = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+  const today = new Date().toISOString().split("T")[0];
+
+  if (environmentVariables.nodeEnv !== "production") {
+    return `test-sub-${userId}-${Date.now()}`;
+  }
+
   return `sub-${userId}-${today}`;
 };
+
 
 export const createCheckoutSession = async (req, res, next) => {
   try {
