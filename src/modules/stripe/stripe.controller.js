@@ -11,7 +11,7 @@ const generateIdempotencyKey = (userId) => {
   const today = new Date().toISOString().split("T")[0];
 
   // if (environmentVariables.nodeEnv !== "production") {
-    return `test-sub-${userId}-${Date.now()}`;
+  return `test-sub-${userId}-${Date.now()}`;
   // }
 
   return `sub-${userId}-${today}`;
@@ -34,8 +34,7 @@ export const createCheckoutSession = async (req, res, next) => {
     if (
       !idempotencyKey ||
       (req.user.idempotencyCreatedAt &&
-        Date.now() -
-          new Date(req.user.idempotencyCreatedAt).getTime() >
+        Date.now() - new Date(req.user.idempotencyCreatedAt).getTime() >
           10 * 60 * 1000)
     ) {
       idempotencyKey = generateIdempotencyKey(req.user._id);
@@ -46,7 +45,8 @@ export const createCheckoutSession = async (req, res, next) => {
       });
     }
 
-    const sessionObjectData =  {
+    const session = await stripe.checkout.sessions.create(
+      {
         mode: "subscription",
 
         customer_email: req.user.email,
@@ -77,11 +77,7 @@ export const createCheckoutSession = async (req, res, next) => {
 
         success_url: `${environmentVariables.frontendUrl}/payment-status?success=true`,
         cancel_url: `${environmentVariables.frontendUrl}/payment-status?canceled=true`,
-      }
-
-
-    const session = await stripe.checkout.sessions.create(
-     sessionObjectData,
+      },
       {
         idempotencyKey,
       }
@@ -114,19 +110,11 @@ export const stripeWebhook = async (req, res) => {
   const eventType = event.type;
   const data = event.data.object;
 
-  console.log("🔔 Stripe Event:", eventType);
-  console.log("data:",data);
-  console.log("---");
-  
-
-  // ✅ Always rely on metadata (NO Stripe API calls here)
-  const userId =
-    data?.metadata?.user_id ||
-    data?.subscription_details?.metadata?.user_id;
+  // ✅ CORRECT extraction (based on invoice payload)
+  const userId = data?.parent?.subscription_details?.metadata?.user_id;
 
   const subscriptionId =
-    data?.subscription ||
-    data?.subscription_details?.subscription;
+    data?.subscription || data?.parent?.subscription_details?.subscription;
 
   try {
     // 1️⃣ PAYMENT SUCCESS
@@ -134,7 +122,6 @@ export const stripeWebhook = async (req, res) => {
       if (!userId || !subscriptionId) {
         return res.json({ status: "ignored" });
       }
-
 
       await User.findByIdAndUpdate(userId, {
         paymentDone: true,
