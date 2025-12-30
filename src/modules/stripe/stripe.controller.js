@@ -46,8 +46,7 @@ export const createCheckoutSession = async (req, res, next) => {
       });
     }
 
-    const session = await stripe.checkout.sessions.create(
-      {
+    const sessionObjectData =  {
         mode: "subscription",
 
         customer_email: req.user.email,
@@ -78,7 +77,12 @@ export const createCheckoutSession = async (req, res, next) => {
 
         success_url: `${environmentVariables.frontendUrl}/payment-status?success=true`,
         cancel_url: `${environmentVariables.frontendUrl}/payment-status?canceled=true`,
-      },
+      }
+
+      console.log(sessionObjectData)
+
+    const session = await stripe.checkout.sessions.create(
+     sessionObjectData,
       {
         idempotencyKey,
       }
