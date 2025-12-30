@@ -86,6 +86,7 @@ export const stripeWebhook = async (req, res, next) => {
       sig,
       environmentVariables.stripeWebhookSecret
     );
+    console.log(event);
   } catch (err) {
     return res.status(400).json({ error: err.message });
   }
