@@ -75,8 +75,8 @@ export const createCheckoutSession = async (req, res, next) => {
           },
         ],
 
-        success_url: `${environmentVariables.frontendUrl}/payment-status?success=true`,
-        cancel_url: `${environmentVariables.frontendUrl}/payment-status?canceled=true`,
+        success_url: `${environmentVariables.frontendUrl}/payment-status`,
+        cancel_url: `${environmentVariables.frontendUrl}/payment-status`,
       },
       {
         idempotencyKey,
