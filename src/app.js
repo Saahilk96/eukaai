@@ -30,6 +30,7 @@ app.use("/api/stripe", stripeRoutes);
 
 app.use(express.json());
 
+
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/fullguide", fullGuideRoutes);
