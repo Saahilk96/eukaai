@@ -125,7 +125,7 @@ export const stripeWebhook = async (req, res) => {
   try {
     // 1️⃣ PAYMENT SUCCESS
     if (eventType === "invoice.payment_succeeded") {
-      console.log("user id",userId,subscriptionId);
+      console.log(data)
       if (!userId || !subscriptionId) {
         return res.json({ status: "ignored" });
       }
