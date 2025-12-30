@@ -79,7 +79,6 @@ export const createCheckoutSession = async (req, res, next) => {
         cancel_url: `${environmentVariables.frontendUrl}/payment-status?canceled=true`,
       }
 
-      console.log(sessionObjectData)
 
     const session = await stripe.checkout.sessions.create(
      sessionObjectData,
@@ -116,6 +115,9 @@ export const stripeWebhook = async (req, res) => {
   const data = event.data.object;
 
   console.log("🔔 Stripe Event:", eventType);
+  console.log("data:",data);
+  console.log("---");
+  
 
   // ✅ Always rely on metadata (NO Stripe API calls here)
   const userId =
@@ -129,7 +131,6 @@ export const stripeWebhook = async (req, res) => {
   try {
     // 1️⃣ PAYMENT SUCCESS
     if (eventType === "invoice.payment_succeeded") {
-      console.log(data)
       if (!userId || !subscriptionId) {
         return res.json({ status: "ignored" });
       }
