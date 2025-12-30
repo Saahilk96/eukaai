@@ -129,6 +129,8 @@ export const stripeWebhook = async (req, res) => {
         return res.json({ status: "ignored" });
       }
 
+      console.log("user id",userId,subscriptionId)
+
       await User.findByIdAndUpdate(userId, {
         paymentDone: true,
         subscriptionId,
