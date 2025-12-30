@@ -20,6 +20,7 @@ const environmentVariables = {
   stripeSecretKey:process.env.STRIPE_TEST_SECRET_KEY,
   nodeEnv: process.env.NODE_ENV,
   corsOrigin: process.env.CORS_ORIGIN,
+  frontendUrl:process.env.CORS_ORIGIN
 };
 
 export default environmentVariables;
