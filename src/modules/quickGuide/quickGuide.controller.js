@@ -35,7 +35,6 @@ export const createQuickGuide = async (req, res, next) => {
           .status(400)
           .json({ status: false, message: "Resume size must be under 5MB" });
       }
-
       userResume = await extractText(req.file.path);
     }
 
