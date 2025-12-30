@@ -18,6 +18,7 @@ const userSchema = new mongoose.Schema(
     refreshToken: { type: String }, // Array to store refresh tokens
     // 🔐 Idempotency handling
     subscriptionId: String,
+    cancelAtPeriodEnd: { type: Boolean, default: false },
     idempotencyKey: String,
     idempotencyCreatedAt: Date,
   },

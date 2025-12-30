@@ -21,8 +21,7 @@ export const login = async (req, res, next) => {
     const { email, ...rest } = req.body;
 
     // 1️⃣ Find user (fast lean)
-    let user = await User.findOne({ email }).select("-refreshToken").lean();
-
+    let user = await User.findOne({ email }).select("-refreshToken");
     // 2️⃣ If no user, create immediately (only 1 write)
     if (!user) {
       const newUser = await User.create({ email, ...rest });
