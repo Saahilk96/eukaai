@@ -2,6 +2,7 @@ import express from "express";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import stripeRoutes from "./modules/stripe/stripe.routes.js";
+import stripeRoutes1 from "./modules/stripe/stripe.routes1.js";
 import userRoutes from "./modules/user/user.routes.js";
 import fullGuideRoutes from "./modules/fullGuide/fullGuide.routes.js";
 import moduleRoutes from "./modules/module/module.routes.js";
@@ -27,6 +28,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 app.use("/api/stripe", stripeRoutes);
+app.use("/stripe", stripeRoutes1);
 
 app.use(express.json());
 
