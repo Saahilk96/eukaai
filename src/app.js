@@ -4,6 +4,7 @@ import cors from "cors";
 import stripeRoutes from "./modules/stripe/stripe.routes.js";
 import stripeRoutes1 from "./modules/stripe/stripe.routes1.js";
 import userRoutes from "./modules/user/user.routes.js";
+import waitListRoutes from "./modules/waitList/waitList.routes.js";
 import fullGuideRoutes from "./modules/fullGuide/fullGuide.routes.js";
 import moduleRoutes from "./modules/module/module.routes.js";
 import subModuleRoutes from "./modules/subModule/subModule.routes.js";
@@ -35,6 +36,7 @@ app.use(express.json());
 
 app.use("/api/auth", authRoutes);
 app.use("/api/user", userRoutes);
+app.use("/api/waitlist", waitListRoutes);
 app.use("/api/fullguide", fullGuideRoutes);
 app.use("/api/module", moduleRoutes);
 app.use("/api/submodule", subModuleRoutes);
