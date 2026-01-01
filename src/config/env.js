@@ -16,7 +16,7 @@ const environmentVariables = {
   openrouterApiKey:process.env.OPENROUTER_API_KEY,
   email: process.env.EMAIL,
   appPassword: process.env.APP_PASSWORD,
-  stripeWebhookSecret:process.env.STRIPE_TEST_WEBHOOK_SECRET,
+  stripeWebhookSecret:process.env.STRIPE_WEBHOOK_SECRET,
   stripeSecretKey:process.env.STRIPE_TEST_SECRET_KEY,
   nodeEnv: process.env.NODE_ENV,
   corsOrigin: process.env.CORS_ORIGIN,
