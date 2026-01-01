@@ -10,9 +10,9 @@ const stripe = new Stripe(environmentVariables.stripeSecretKey);
 const generateIdempotencyKey = (userId) => {
   const today = new Date().toISOString().split("T")[0];
 
-  // if (environmentVariables.nodeEnv !== "production") {
+  if (environmentVariables.nodeEnv !== "production") {
   return `test-sub-${userId}-${Date.now()}`;
-  // }
+  }
 
   return `sub-${userId}-${today}`;
 };
