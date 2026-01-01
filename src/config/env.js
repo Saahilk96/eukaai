@@ -17,7 +17,7 @@ const environmentVariables = {
   email: process.env.EMAIL,
   appPassword: process.env.APP_PASSWORD,
   stripeWebhookSecret:process.env.STRIPE_WEBHOOK_SECRET,
-  stripeSecretKey:process.env.STRIPE_TEST_SECRET_KEY,
+  stripeSecretKey:process.env.STRIPE_SECRET_KEY,
   nodeEnv: process.env.NODE_ENV,
   corsOrigin: process.env.CORS_ORIGIN,
   frontendUrl:process.env.CORS_ORIGIN
