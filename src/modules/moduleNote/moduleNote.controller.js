@@ -43,6 +43,17 @@ export const updateModuleNote = async (req, res, next) => {
   session.startTransaction();
 
   try {
+    if(req.body.note.length==0)
+    {
+      await session.commitTransaction();
+    session.endSession();
+
+    return res.status(201).json({
+      success: true,
+      message: "note updated successfully",
+    });
+    }
+      
     await moduleNote.updateOne(
       {
         userId: req.user._id,
@@ -51,7 +62,7 @@ export const updateModuleNote = async (req, res, next) => {
       },
       {
         $set: {
-          note: req.body.note,
+          note:req.body.note,
         },
       },
       { session }
