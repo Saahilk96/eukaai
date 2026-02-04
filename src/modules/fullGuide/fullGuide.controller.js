@@ -207,7 +207,7 @@ export const createFullGuide = async (req, res, next) => {
         ...resumeExperienceToStandOutResponse,
       };
       favouriteProductQuestionResponse = {
-        name: "Fovourite Product Question",
+        name: "Favourite Product Question",
         ...favouriteProductQuestionResponse,
       };
       productDesignResponse = {
