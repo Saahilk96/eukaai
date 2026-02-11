@@ -10,11 +10,11 @@ import moduleSources from "../moduleSources/moduleSources.model.js";
 import subModuleContent from "../subModuleContent/subModuleContent.model.js";
 
 import {
-  behavioralAndLeadershipResponse,
-  analyticalEstimationResponse,
-  productStrategyResponse,
-  technicalResponse,
-  productSenseResponse,
+  // behavioralAndLeadershipResponse,
+  // analyticalEstimationResponse,
+  // productStrategyResponse,
+  // technicalResponse,
+  // productSenseResponse,
 } from "../../utils/fullGuide/responseAnswer.js";
 import {
   knowTheCompany,
@@ -24,6 +24,11 @@ import {
   resumeExperienceToStandOut,
   favouriteProductQuestion,
   productDesign,
+  behavioralAndLeadership,
+  analyticalEstimation,
+  productStrategy,
+  productSense,
+  technical
 } from "../../utils/fullGuide/prompts.js";
 import { staticQuestions } from "../../utils/fullGuide/staticQuestions.js";
 
@@ -105,11 +110,7 @@ export const createFullGuide = async (req, res, next) => {
       const subModuleContents = [];
 
       let fullGuideModuleResponses = [
-        behavioralAndLeadershipResponse,
-        analyticalEstimationResponse,
-        productStrategyResponse,
-        technicalResponse,
-        productSenseResponse,
+        // technicalResponse,
       ];
 
       fullGuideModuleResponses.forEach((moduleResponse) => {
@@ -167,6 +168,11 @@ export const createFullGuide = async (req, res, next) => {
         knowTheCompanyResponse,
         productResearchResponse,
         recruiterScreenPreperationResponse,
+        behavioralAndLeadershipResponse,
+        analyticalEstimationResponse,
+        productStrategyResponse,
+        productSenseResponse,
+        technicalResponse,
       ] = await Promise.all([
         responseLLMGenerator(jobDescriptionAnalysis(promptInputData).prompt),
         responseLLMGenerator(
@@ -180,6 +186,21 @@ export const createFullGuide = async (req, res, next) => {
         ),
         responseLLMGeneratorWithSources(
           recruiterScreenPreperation(promptInputData).prompt
+        ),
+        responseLLMGeneratorWithSources(
+          behavioralAndLeadership(promptInputData).prompt
+        ),
+        responseLLMGeneratorWithSources(
+          analyticalEstimation(promptInputData).prompt
+        ),
+        responseLLMGeneratorWithSources(
+          productStrategy(promptInputData).prompt
+        ),
+        responseLLMGeneratorWithSources(
+          productSense(promptInputData).prompt
+        ),
+        responseLLMGeneratorWithSources(
+          technical(promptInputData).prompt
         ),
       ]);
 
@@ -215,11 +236,41 @@ export const createFullGuide = async (req, res, next) => {
         ...productDesignResponse,
       };
 
+      behavioralAndLeadershipResponse = {
+        name: "Behavioral and Leadership",
+        ...behavioralAndLeadershipResponse,
+      };
+
+      analyticalEstimationResponse = {
+        name: "Analytical Estimation",
+        ...analyticalEstimationResponse,
+      };
+
+      productStrategyResponse = {
+        name: "Product Strategy",
+        ...productStrategyResponse,
+      };
+
+      productSenseResponse = {
+        name: "Product Sense",
+        ...productSenseResponse,
+      };
+
+      technicalResponse = {
+        name: "Technical",
+        ...technicalResponse,
+      };
+
       fullGuideModuleResponses = [
         jobDescriptionAnalysisResponse,
         resumeExperienceToStandOutResponse,
         favouriteProductQuestionResponse,
         productDesignResponse,
+        behavioralAndLeadershipResponse,
+        analyticalEstimationResponse,
+        productStrategyResponse,
+        productSenseResponse,
+        technicalResponse,
       ];
 
       fullGuideModuleResponses.forEach((moduleResponse) => {
@@ -237,7 +288,6 @@ export const createFullGuide = async (req, res, next) => {
           fullGuideId,
           moduleId,
         });
-
         moduleResponse.subModules.forEach((subModuleResponse) => {
           const subModuleId = new mongoose.Types.ObjectId();
           subModules.push({
