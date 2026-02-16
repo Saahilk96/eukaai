@@ -314,14 +314,14 @@ export const createFullGuide = async (req, res, next) => {
         recruiterScreenPreperationSummaryResponse,
       ] = await Promise.all([
         responseSummaryLLMGenerator(
-          knowTheCompanySummaryPrompt(knowTheCompanyResponse)
+          knowTheCompanySummaryPrompt(promptInputData,knowTheCompanyResponse)
         ),
         responseSummaryLLMGenerator(
-          productResearchSummaryPrompt(productResearchResponse)
+          productResearchSummaryPrompt(promptInputData,productResearchResponse)
         ),
         responseSummaryLLMGenerator(
           recruiterScreenPreperationSummaryPrompt(
-            recruiterScreenPreperationResponse
+            promptInputData,recruiterScreenPreperationResponse
           )
         ),
       ]);

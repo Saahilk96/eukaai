@@ -12,11 +12,13 @@ export const responseLLMGenerator = async (prompt) =>{
       body: JSON.stringify({
         model: "google/gemini-2.5-flash-lite", // :online enables web search
         messages: [{ role: "user", content: prompt }],
+        // stream:true,
+
         response_format: {
           type: "json_schema",
           json_schema: {
             name: "course_summary",
-            none: true,
+            // "strict": true,
             schema: {
               type: "object",
               properties: {
@@ -58,11 +60,14 @@ export const responseLLMGenerator = async (prompt) =>{
             },
           },
         },
+        plugins: [
+      { id: 'response-healing' }
+    ]
       }),
     }
   );
   const data = await response.json();
-  return JSON.parse(data.choices?.[0]?.message?.content) || {subModules:[]}
+  return JSON.parse(data.choices?.[0]?.message?.content) || { quickSummary: "", subModules: [] }
 }
 
 export const responseLLMGeneratorWithSources = async (prompt) =>{
@@ -77,11 +82,12 @@ export const responseLLMGeneratorWithSources = async (prompt) =>{
       body: JSON.stringify({
         model: "google/gemini-2.5-flash-lite:online", // :online enables web search
         messages: [{ role: "user", content: prompt }],
+        // stream:true,
         response_format: {
           type: "json_schema",
           json_schema: {
             name: "course_summary",
-            none: true,
+            // "strict": true,
             schema: {
               type: "object",
               properties: {
@@ -123,6 +129,9 @@ export const responseLLMGeneratorWithSources = async (prompt) =>{
             },
           },
         },
+        plugins: [
+      { id: 'response-healing' }
+    ]
       }),
     }
   );
@@ -144,9 +153,29 @@ export const responseSummaryLLMGenerator = async (prompt) =>{
       body: JSON.stringify({
         model: "google/gemini-2.5-flash-lite", // :online enables web search
         messages: [{ role: "user", content: prompt }],
+        response_format: {
+          type: "json_schema",
+          json_schema: {
+            name: "course_summary",
+            schema: {
+              type: "object",
+              properties: {
+                summary: {
+                  type: "string",
+                  description: "full summary html of the module",
+                },
+              },
+              required: ["summary"],
+              additionalProperties: false,
+            },
+          },
+        },
+        plugins: [
+      { id: 'response-healing' }
+    ]
       }),
     }
   );
   const data = await response.json();
-  return data.choices?.[0]?.message?.content || ""
+  return JSON.parse(data.choices?.[0]?.message?.content).summary || ""
 }

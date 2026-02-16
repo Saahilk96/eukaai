@@ -1,5 +1,12 @@
-export const knowTheCompanySummaryPrompt = (data) =>
-     `<role>
+export const knowTheCompanySummaryPrompt = (data,pageData) =>
+     {
+      const companyName = data?.companyName?.trim() || "";
+  const companyWebsite = data?.companyWebsite?.trim() || "";
+  const jobRole = data?.jobRole?.trim() || "";
+  const jobDescription = data?.jobDescription?.trim() || "";
+  const userResume = data?.userResume?.trim() || "";
+
+      return `<role>
 You are an expert interview preparation coach specializing in product manager interviews.
 You have been given comprehensive company research data with multiple detailed modules.
 Your task is to distill this into a focused, one-page executive summary.
@@ -11,7 +18,17 @@ Extract and synthesize the most important points from the provided company resea
 </task>
 
 <input_data>
-${data}
+INPUT (authoritative):
+COMPANY_NAME: ${companyName || "Not provided"}
+COMPANY_WEBSITE: ${companyWebsite || "Not provided"}
+JOB_ROLE: ${jobRole || "Not provided"}
+JOB_DESCRIPTION: ${jobDescription || "Not provided"}
+USER_RESUME: ${userResume || "Not provided"}
+</input_data>
+
+<input_data>
+INPUT (authoritative):
+PAGE DATA: '${pageData}'
 </input_data>
 
 <selection_criteria>
@@ -128,9 +145,16 @@ Use only Tailwind CSS utility classes for styling.
 - If critical information is missing, omit the section rather than guess
 - Focus on facts that demonstrate business acumen and product thinking
 </constraints>`
+     }
 
-export const productResearchSummaryPrompt = (data) =>
-     `<role>
+export const productResearchSummaryPrompt =(data,pageData) =>
+     {
+      const companyName = data?.companyName?.trim() || "";
+  const companyWebsite = data?.companyWebsite?.trim() || "";
+  const jobRole = data?.jobRole?.trim() || "";
+  const jobDescription = data?.jobDescription?.trim() || "";
+  const userResume = data?.userResume?.trim() || "";
+  return`<role>
 You are an expert interview preparation coach specializing in product manager interviews.
 You have been given deep product research data for a company's flagship platform or service.
 Your task is to distill this into a focused, one-page HTML product brief.
@@ -142,7 +166,17 @@ Extract, synthesize, and organize product-specific information to help the candi
 </task>
 
 <input_data>
-${data}
+INPUT (authoritative):
+COMPANY_NAME: ${companyName || "Not provided"}
+COMPANY_WEBSITE: ${companyWebsite || "Not provided"}
+JOB_ROLE: ${jobRole || "Not provided"}
+JOB_DESCRIPTION: ${jobDescription || "Not provided"}
+USER_RESUME: ${userResume || "Not provided"}
+</input_data>
+
+<input_data>
+INPUT (authoritative):
+PAGE DATA: '${pageData}'
 </input_data>
 
 <selection_criteria>
@@ -257,9 +291,17 @@ Use only Tailwind CSS utility classes for styling.
 - Only include verified information from the product data
 - Leave out any sections if data is missing — do not guess
 - Prioritize actionable insights over complete coverage
-</constraints>`
+</constraints>`}
 
-export const recruiterScreenPreperationSummaryPrompt = (data) =>`<role>
+export const recruiterScreenPreperationSummaryPrompt = (data,pageData) =>
+     {
+      const companyName = data?.companyName?.trim() || "";
+  const companyWebsite = data?.companyWebsite?.trim() || "";
+  const jobRole = data?.jobRole?.trim() || "";
+  const jobDescription = data?.jobDescription?.trim() || "";
+  const userResume = data?.userResume?.trim() || "";
+  
+  return `<role>
 You are an expert career coach specializing in helping candidates ace recruiter screening calls.
 You have been provided with detailed recruiter preparation data, including insights into the recruiter's goals, guidance for a self-introduction, and a list of questions to ask.
 Your task is to synthesize this information into a concise, actionable HTML summary designed to prepare a candidate for a recruiter screen.
@@ -271,7 +313,17 @@ Extract and synthesize the most important points from the provided recruiter pre
 </task>
 
 <input_data>
-${data}
+INPUT (authoritative):
+COMPANY_NAME: ${companyName || "Not provided"}
+COMPANY_WEBSITE: ${companyWebsite || "Not provided"}
+JOB_ROLE: ${jobRole || "Not provided"}
+JOB_DESCRIPTION: ${jobDescription || "Not provided"}
+USER_RESUME: ${userResume || "Not provided"}
+</input_data>
+
+<input_data>
+INPUT (authoritative):
+PAGE DATA: '${pageData}'
 </input_data>
 
 <selection_criteria>
@@ -378,4 +430,4 @@ Use only Tailwind CSS utility classes for styling.
 - Only include verified information from the source data.
 - If critical information is missing (e.g., salary), explicitly state "Not provided" or "Unclear" rather than omitting the section or guessing.
 - Focus on actionable advice for the candidate.
-</constraints>`
+</constraints>`}
