@@ -10,13 +10,6 @@ import moduleSources from "../moduleSources/moduleSources.model.js";
 import subModuleContent from "../subModuleContent/subModuleContent.model.js";
 
 import {
-  // behavioralAndLeadershipResponse,
-  // analyticalEstimationResponse,
-  // productStrategyResponse,
-  // technicalResponse,
-  // productSenseResponse,
-} from "../../utils/fullGuide/responseAnswer.js";
-import {
   knowTheCompany,
   productResearch,
   recruiterScreenPreperation,
@@ -28,7 +21,7 @@ import {
   analyticalEstimation,
   productStrategy,
   productSense,
-  technical
+  technical,
 } from "../../utils/fullGuide/prompts.js";
 import { staticQuestions } from "../../utils/fullGuide/staticQuestions.js";
 
@@ -54,473 +47,281 @@ const extractText = async (filePath) => {
   return data.text;
 };
 
+// Builds the flat DB arrays for a module response (modules without summaries/questions/sources)
+function buildModuleDocuments(moduleResponse, { userId, fullGuideId, modules, moduleNotes, subModules, subModuleContents }) {
+  const moduleId = new mongoose.Types.ObjectId();
+
+  modules.push({
+    _id: moduleId,
+    userId,
+    fullGuideId,
+    title: moduleResponse.name,
+    summaryText: moduleResponse.quickSummary,
+  });
+
+  moduleNotes.push({ userId, fullGuideId, moduleId });
+
+  for (const sm of moduleResponse.subModules) {
+    const subModuleId = new mongoose.Types.ObjectId();
+    subModules.push({
+      _id: subModuleId,
+      userId,
+      moduleId,
+      fullGuideId,
+      title: sm.title,
+      summaryText: sm.summary,
+    });
+    subModuleContents.push({
+      userId,
+      subModuleId,
+      fullGuideId,
+      htmlText: sm.htmlContent,
+    });
+  }
+
+  return moduleId;
+}
+
+// Builds DB arrays for source modules (knowTheCompany, productResearch, recruiterScreen)
+function buildSourceModuleDocuments(moduleResponse, summaryHtml, { userId, fullGuideId, modules, moduleNotes, subModules, subModuleContents, moduleSummaries, moduleQuestions, moduleQuestionContents, sources }) {
+  const moduleId = new mongoose.Types.ObjectId();
+
+  modules.push({
+    _id: moduleId,
+    userId,
+    fullGuideId,
+    title: moduleResponse.name,
+    summaryText: moduleResponse.quickSummary,
+    isSources: moduleResponse.sources ? true : false,
+  });
+
+  moduleNotes.push({ userId, fullGuideId, moduleId });
+
+  moduleSummaries.push({
+    userId,
+    moduleId,
+    fullGuideId,
+    summaryHtmlText: summaryHtml,
+  });
+
+  moduleQuestions.push({
+    userId,
+    fullGuideId,
+    moduleId,
+    title: "Practice Questions",
+    summaryText:
+      "These questions are commonly asked about company knowledge. Practice your responses and use the auto-generate feature to get sample answers and talking points.",
+  });
+
+  for (const sq of staticQuestions) {
+    moduleQuestionContents.push({
+      userId,
+      fullGuideId,
+      moduleId,
+      question: sq.question,
+      answer: sq.answer,
+    });
+  }
+
+  for (const sm of moduleResponse.subModules) {
+    const subModuleId = new mongoose.Types.ObjectId();
+    subModules.push({
+      _id: subModuleId,
+      userId,
+      moduleId,
+      fullGuideId,
+      title: sm.title,
+      summaryText: sm.summary,
+    });
+    subModuleContents.push({
+      userId,
+      subModuleId,
+      fullGuideId,
+      htmlText: sm.htmlContent,
+    });
+  }
+
+  if (moduleResponse.sources) {
+    for (const source of moduleResponse.sources) {
+      sources.push({
+        userId,
+        fullGuideId,
+        moduleId,
+        title: source.title,
+        text: source.content,
+        url: source.url,
+      });
+    }
+  }
+}
+
+const EMPTY_GUIDE = { quickSummary: "", subModules: [], sources: [] };
+
 export const createFullGuide = async (req, res, next) => {
   const uploadedFilePath = req.file?.path;
   try {
     const { jobDescription, jobRole, companyName, companyWebsite } = req.body;
     let userResume = req.user.resume;
+
     if (req.file) {
       if (!["application/pdf"].includes(req.file.mimetype)) {
-        return res
-          .status(400)
-          .json({ status: false, message: "Only PDF resumes are allowed" });
+        return res.status(400).json({ status: false, message: "Only PDF resumes are allowed" });
       }
-
       if (req.file.size > 5 * 1024 * 1024) {
-        // 2MB max
-        return res
-          .status(400)
-          .json({ status: false, message: "Resume size must be under 5MB" });
+        return res.status(400).json({ status: false, message: "Resume size must be under 5MB" });
       }
-
       userResume = await extractText(req.file.path);
     }
 
     if (req.user.totalGeneratedFullGuides >= 1 && !req.user.paymentDone) {
       return res.status(403).json({
         status: false,
-        message:
-          "Free trial limit reached. Please make a payment to continue creating full guides.",
+        message: "Free trial limit reached. Please make a payment to continue creating full guides.",
       });
     }
 
-    if (!userResume)
-      return res
-        .status(400)
-        .json({ status: false, message: "Resume required" });
+    if (!userResume) {
+      return res.status(400).json({ status: false, message: "Resume required" });
+    }
 
+    const promptInputData = { companyName, jobRole, jobDescription, userResume };
+    if (companyWebsite !== undefined) promptInputData.companyWebsite = companyWebsite;
+
+    // --- Phase 1: Fire all 12 LLM calls simultaneously ---
+    // The 3 source modules (knowTheCompany, productResearch, recruiterScreen) need
+    // summaries generated from their output. We chain their summaries directly so
+    // they start as soon as each one resolves, without waiting for the other 9.
+
+    const knowTheCompanyPromise = responseLLMGeneratorWithSources(knowTheCompany(promptInputData).prompt)
+      .catch(() => EMPTY_GUIDE)
+      .then(async (res) => {
+        const r = { name: "Know the Company", ...res };
+        const summary = await responseSummaryLLMGenerator(knowTheCompanySummaryPrompt(promptInputData, r)).catch(() => "");
+        return { response: r, summary };
+      });
+
+    const productResearchPromise = responseLLMGeneratorWithSources(productResearch(promptInputData).prompt)
+      .catch(() => EMPTY_GUIDE)
+      .then(async (res) => {
+        const r = { name: "Product Research", ...res };
+        const summary = await responseSummaryLLMGenerator(productResearchSummaryPrompt(promptInputData, r)).catch(() => "");
+        return { response: r, summary };
+      });
+
+    const recruiterScreenPromise = responseLLMGeneratorWithSources(recruiterScreenPreperation(promptInputData).prompt)
+      .catch(() => EMPTY_GUIDE)
+      .then(async (res) => {
+        const r = { name: "Recruiter Screen Preperation", ...res };
+        const summary = await responseSummaryLLMGenerator(recruiterScreenPreperationSummaryPrompt(promptInputData, r)).catch(() => "");
+        return { response: r, summary };
+      });
+
+    const [
+      jobDescriptionAnalysisResult,
+      resumeExperienceToStandOutResult,
+      favouriteProductQuestionResult,
+      productDesignResult,
+      behavioralAndLeadershipResult,
+      analyticalEstimationResult,
+      productStrategyResult,
+      productSenseResult,
+      technicalResult,
+      knowTheCompanyResult,
+      productResearchResult,
+      recruiterScreenResult,
+    ] = await Promise.allSettled([
+      responseLLMGenerator(jobDescriptionAnalysis(promptInputData).prompt),
+      responseLLMGenerator(resumeExperienceToStandOut(promptInputData).prompt),
+      responseLLMGenerator(favouriteProductQuestion(promptInputData).prompt),
+      responseLLMGenerator(productDesign(promptInputData).prompt),
+      responseLLMGeneratorWithSources(behavioralAndLeadership(promptInputData).prompt),
+      responseLLMGeneratorWithSources(analyticalEstimation(promptInputData).prompt),
+      responseLLMGeneratorWithSources(productStrategy(promptInputData).prompt),
+      responseLLMGeneratorWithSources(productSense(promptInputData).prompt),
+      responseLLMGeneratorWithSources(technical(promptInputData).prompt),
+      knowTheCompanyPromise,
+      productResearchPromise,
+      recruiterScreenPromise,
+    ]);
+
+    const getValue = (result, fallback) =>
+      result.status === "fulfilled" ? result.value : fallback;
+
+    const standardModules = [
+      { name: "Job Description Analysis",        ...getValue(jobDescriptionAnalysisResult, EMPTY_GUIDE) },
+      { name: "Resume Experience to Stand Out",  ...getValue(resumeExperienceToStandOutResult, EMPTY_GUIDE) },
+      { name: "Favourite Product Question",      ...getValue(favouriteProductQuestionResult, EMPTY_GUIDE) },
+      { name: "Product Design",                  ...getValue(productDesignResult, EMPTY_GUIDE) },
+      { name: "Behavioral and Leadership",       ...getValue(behavioralAndLeadershipResult, EMPTY_GUIDE) },
+      { name: "Analytical Estimation",           ...getValue(analyticalEstimationResult, EMPTY_GUIDE) },
+      { name: "Product Strategy",                ...getValue(productStrategyResult, EMPTY_GUIDE) },
+      { name: "Product Sense",                   ...getValue(productSenseResult, EMPTY_GUIDE) },
+      { name: "Technical",                       ...getValue(technicalResult, EMPTY_GUIDE) },
+    ];
+
+    const { response: knowTheCompanyResponse, summary: knowTheCompanySummary } =
+      getValue(knowTheCompanyResult, { response: { name: "Know the Company", ...EMPTY_GUIDE }, summary: "" });
+    const { response: productResearchResponse, summary: productResearchSummary } =
+      getValue(productResearchResult, { response: { name: "Product Research", ...EMPTY_GUIDE }, summary: "" });
+    const { response: recruiterScreenResponse, summary: recruiterScreenSummary } =
+      getValue(recruiterScreenResult, { response: { name: "Recruiter Screen Preperation", ...EMPTY_GUIDE }, summary: "" });
+
+    // --- Phase 2: Build all DB documents ---
+    const fullGuideId = new mongoose.Types.ObjectId();
+    const userId = req.user._id;
+
+    const modules = [];
+    const moduleNotes = [];
+    const subModules = [];
+    const subModuleContents = [];
+    const moduleSummaries = [];
+    const moduleQuestions = [];
+    const moduleQuestionContents = [];
+    const sources = [];
+
+    for (const mod of standardModules) {
+      buildModuleDocuments(mod, { userId, fullGuideId, modules, moduleNotes, subModules, subModuleContents });
+    }
+
+    buildSourceModuleDocuments(knowTheCompanyResponse, knowTheCompanySummary, { userId, fullGuideId, modules, moduleNotes, subModules, subModuleContents, moduleSummaries, moduleQuestions, moduleQuestionContents, sources });
+    buildSourceModuleDocuments(productResearchResponse, productResearchSummary, { userId, fullGuideId, modules, moduleNotes, subModules, subModuleContents, moduleSummaries, moduleQuestions, moduleQuestionContents, sources });
+    buildSourceModuleDocuments(recruiterScreenResponse, recruiterScreenSummary, { userId, fullGuideId, modules, moduleNotes, subModules, subModuleContents, moduleSummaries, moduleQuestions, moduleQuestionContents, sources });
+
+    // --- Phase 3: Write to DB in a transaction (session opened only now) ---
     const session = await mongoose.startSession();
 
     try {
-      const fullGuideId = new mongoose.Types.ObjectId();
       let newFullGuideData = {
-        userId: req.user._id,
+        userId,
         _id: fullGuideId,
         companyName: req.body.companyName,
         jobRole: req.body.jobRole,
       };
 
-      const modules = [];
-      const moduleNotes = [];
-      const sources = [];
-      const moduleQuestions = [];
-      const moduleSummaries = [];
-      const moduleQuestionContents = [];
-      const subModules = [];
-      const subModuleContents = [];
-
-      let fullGuideModuleResponses = [
-        // technicalResponse,
-      ];
-
-      fullGuideModuleResponses.forEach((moduleResponse) => {
-        const moduleId = new mongoose.Types.ObjectId();
-        modules.push({
-          _id: moduleId,
-          userId: req.user._id,
-          fullGuideId,
-          title: moduleResponse.name,
-          summaryText: moduleResponse.quickSummary,
-        });
-
-        moduleNotes.push({
-          userId: req.user._id,
-          fullGuideId,
-          moduleId,
-        });
-
-        moduleResponse.subModules.forEach((subModuleResponse) => {
-          const subModuleId = new mongoose.Types.ObjectId();
-          subModules.push({
-            _id: subModuleId,
-            userId: req.user._id,
-            moduleId,
-            fullGuideId,
-            title: subModuleResponse.title,
-            summaryText: subModuleResponse.summary,
-          });
-
-          subModuleContents.push({
-            userId: req.user._id,
-            subModuleId,
-            fullGuideId,
-            htmlText: subModuleResponse.htmlContent,
-          });
-        });
-      });
-
-      let promptInputData = {
-        companyName,
-        jobRole,
-        jobDescription,
-        userResume,
-      };
-
-      if (companyWebsite !== undefined) {
-        promptInputData.companyWebsite = companyWebsite;
-      }
-
-      let [
-        jobDescriptionAnalysisResponse,
-        resumeExperienceToStandOutResponse,
-        favouriteProductQuestionResponse,
-        productDesignResponse,
-        knowTheCompanyResponse,
-        productResearchResponse,
-        recruiterScreenPreperationResponse,
-        behavioralAndLeadershipResponse,
-        analyticalEstimationResponse,
-        productStrategyResponse,
-        productSenseResponse,
-        technicalResponse,
-      ] = await Promise.all([
-        responseLLMGenerator(jobDescriptionAnalysis(promptInputData).prompt),
-        responseLLMGenerator(
-          resumeExperienceToStandOut(promptInputData).prompt
-        ),
-        responseLLMGenerator(favouriteProductQuestion(promptInputData).prompt),
-        responseLLMGenerator(productDesign(promptInputData).prompt),
-        responseLLMGeneratorWithSources(knowTheCompany(promptInputData).prompt),
-        responseLLMGeneratorWithSources(
-          productResearch(promptInputData).prompt
-        ),
-        responseLLMGeneratorWithSources(
-          recruiterScreenPreperation(promptInputData).prompt
-        ),
-        responseLLMGeneratorWithSources(
-          behavioralAndLeadership(promptInputData).prompt
-        ),
-        responseLLMGeneratorWithSources(
-          analyticalEstimation(promptInputData).prompt
-        ),
-        responseLLMGeneratorWithSources(
-          productStrategy(promptInputData).prompt
-        ),
-        responseLLMGeneratorWithSources(
-          productSense(promptInputData).prompt
-        ),
-        responseLLMGeneratorWithSources(
-          technical(promptInputData).prompt
-        ),
-      ]);
-
-      knowTheCompanyResponse = {
-        name: "Know the Company",
-        ...knowTheCompanyResponse,
-      };
-
-      productResearchResponse = {
-        name: "Product Research",
-        ...productResearchResponse,
-      };
-
-      recruiterScreenPreperationResponse = {
-        name: "Recruiter Screen Preperation",
-        ...recruiterScreenPreperationResponse,
-      };
-
-      jobDescriptionAnalysisResponse = {
-        name: "Job Description Analysis",
-        ...jobDescriptionAnalysisResponse,
-      };
-      resumeExperienceToStandOutResponse = {
-        name: "Resume Experience to Stand Out",
-        ...resumeExperienceToStandOutResponse,
-      };
-      favouriteProductQuestionResponse = {
-        name: "Favourite Product Question",
-        ...favouriteProductQuestionResponse,
-      };
-      productDesignResponse = {
-        name: "Product Design",
-        ...productDesignResponse,
-      };
-
-      behavioralAndLeadershipResponse = {
-        name: "Behavioral and Leadership",
-        ...behavioralAndLeadershipResponse,
-      };
-
-      analyticalEstimationResponse = {
-        name: "Analytical Estimation",
-        ...analyticalEstimationResponse,
-      };
-
-      productStrategyResponse = {
-        name: "Product Strategy",
-        ...productStrategyResponse,
-      };
-
-      productSenseResponse = {
-        name: "Product Sense",
-        ...productSenseResponse,
-      };
-
-      technicalResponse = {
-        name: "Technical",
-        ...technicalResponse,
-      };
-
-      fullGuideModuleResponses = [
-        jobDescriptionAnalysisResponse,
-        resumeExperienceToStandOutResponse,
-        favouriteProductQuestionResponse,
-        productDesignResponse,
-        behavioralAndLeadershipResponse,
-        analyticalEstimationResponse,
-        productStrategyResponse,
-        productSenseResponse,
-        technicalResponse,
-      ];
-
-      fullGuideModuleResponses.forEach((moduleResponse) => {
-        const moduleId = new mongoose.Types.ObjectId();
-        modules.push({
-          _id: moduleId,
-          userId: req.user._id,
-          fullGuideId,
-          title: moduleResponse.name,
-          summaryText: moduleResponse.quickSummary
-        });
-
-        moduleNotes.push({
-          userId: req.user._id,
-          fullGuideId,
-          moduleId,
-        });
-        moduleResponse.subModules.forEach((subModuleResponse) => {
-          const subModuleId = new mongoose.Types.ObjectId();
-          subModules.push({
-            _id: subModuleId,
-            userId: req.user._id,
-            moduleId,
-            fullGuideId,
-            title: subModuleResponse.title,
-            summaryText: subModuleResponse.summary,
-          });
-
-          subModuleContents.push({
-            userId: req.user._id,
-            subModuleId,
-            fullGuideId,
-            htmlText: subModuleResponse.htmlContent,
-          });
-        });
-      });
-
-      let [
-        knowTheCompanySummaryResponse,
-        productResearchSummaryResponse,
-        recruiterScreenPreperationSummaryResponse,
-      ] = await Promise.all([
-        responseSummaryLLMGenerator(
-          knowTheCompanySummaryPrompt(promptInputData,knowTheCompanyResponse)
-        ),
-        responseSummaryLLMGenerator(
-          productResearchSummaryPrompt(promptInputData,productResearchResponse)
-        ),
-        responseSummaryLLMGenerator(
-          recruiterScreenPreperationSummaryPrompt(
-            promptInputData,recruiterScreenPreperationResponse
-          )
-        ),
-      ]);
-
-      let summaryResponses = [
-        knowTheCompanySummaryResponse,
-        productResearchSummaryResponse,
-        recruiterScreenPreperationSummaryResponse,
-      ];
-
-      fullGuideModuleResponses = [
-        knowTheCompanyResponse,
-        productResearchResponse,
-        recruiterScreenPreperationResponse,
-      ];
-
-      fullGuideModuleResponses.forEach((moduleResponse, index) => {
-        const moduleId = new mongoose.Types.ObjectId();
-        modules.push({
-          _id: moduleId,
-          userId: req.user._id,
-          fullGuideId,
-          title: moduleResponse.name,
-          summaryText: moduleResponse.quickSummary,
-          isSources:moduleResponse.sources?true:false
-        });
-
-        moduleNotes.push({
-          userId: req.user._id,
-          fullGuideId,
-          moduleId,
-        });
-
-        moduleSummaries.push({
-          userId: req.user._id,
-          moduleId,
-          fullGuideId,
-          summaryHtmlText: summaryResponses[index],
-        });
-
-        moduleQuestions.push({
-          userId: req.user._id,
-          fullGuideId,
-          moduleId,
-          title: "Practice Questions",
-          summaryText:
-            "These questions are commonly asked about company knowledge. Practice your responses and use the auto-generate feature to get sample answers and talking points.",
-        });
-
-        staticQuestions.forEach((staticQuestion) => {
-          moduleQuestionContents.push({
-            userId: req.user._id,
-            fullGuideId,
-            moduleId,
-            question: staticQuestion.question,
-            answer: staticQuestion.answer,
-          });
-        });
-
-        moduleResponse.subModules.forEach((subModuleResponse) => {
-          const subModuleId = new mongoose.Types.ObjectId();
-          subModules.push({
-            _id: subModuleId,
-            userId: req.user._id,
-            moduleId,
-            fullGuideId,
-            title: subModuleResponse.title,
-            summaryText: subModuleResponse.summary,
-          });
-
-          subModuleContents.push({
-            userId: req.user._id,
-            subModuleId,
-            fullGuideId,
-            htmlText: subModuleResponse.htmlContent,
-          });
-        });
-
-        if (moduleResponse.sources) {
-          moduleResponse.sources.forEach((source) => {
-            sources.push({
-              userId: req.user._id,
-              fullGuideId,
-              moduleId,
-              title: source.title,
-              text: source.content,
-              url: source.url,
-            });
-          });
-        }
-      });
-
       await session.withTransaction(async () => {
         const createdDocs = await fullGuide.create([newFullGuideData], { session });
         newFullGuideData = createdDocs[0];
-        // 1. Update user resume if uploaded
-        if (req.file) {
-          await User.updateOne(
-            { _id: req.user._id },
-            {
-              $set: { resume: userResume },
-              $inc: { totalGeneratedFullGuides: 1 },
-            },
-            { session }
-          );
-        } else {
-          // Increment totalFullGuides count
-          await User.updateOne(
-            { _id: req.user._id },
-            {
-              $inc: { totalGeneratedFullGuides: 1 },
-            },
-            { session }
-          );
-        }
 
-        // 2. Bulk insert for "modules"
-        if (modules.length > 0) {
-          await module.bulkWrite(
-            modules.map((m) => ({
-              insertOne: { document: m },
-            })),
-            { session }
-          );
-        }
+        const userUpdate = req.file
+          ? { $set: { resume: userResume }, $inc: { totalGeneratedFullGuides: 1 } }
+          : { $inc: { totalGeneratedFullGuides: 1 } };
+        await User.updateOne({ _id: userId }, userUpdate, { session });
 
-        // 3. Bulk insert for "moduleNotes"
-        if (moduleNotes.length > 0) {
-          await moduleNote.bulkWrite(
-            moduleNotes.map((n) => ({
-              insertOne: { document: n },
-            })),
-            { session }
-          );
-        }
+        const bulkOps = [
+          modules.length > 0 && module.bulkWrite(modules.map((m) => ({ insertOne: { document: m } })), { session }),
+          moduleNotes.length > 0 && moduleNote.bulkWrite(moduleNotes.map((n) => ({ insertOne: { document: n } })), { session }),
+          sources.length > 0 && moduleSources.bulkWrite(sources.map((s) => ({ insertOne: { document: s } })), { session }),
+          moduleQuestions.length > 0 && moduleQuestion.bulkWrite(moduleQuestions.map((q) => ({ insertOne: { document: q } })), { session }),
+          moduleSummaries.length > 0 && moduleSummary.bulkWrite(moduleSummaries.map((s) => ({ insertOne: { document: s } })), { session }),
+          moduleQuestionContents.length > 0 && moduleQuestionContent.bulkWrite(moduleQuestionContents.map((c) => ({ insertOne: { document: c } })), { session }),
+          subModules.length > 0 && subModule.bulkWrite(subModules.map((sm) => ({ insertOne: { document: sm } })), { session }),
+          subModuleContents.length > 0 && subModuleContent.bulkWrite(subModuleContents.map((sc) => ({ insertOne: { document: sc } })), { session }),
+        ].filter(Boolean);
 
-        // 4. Bulk insert for "sources"
-        if (sources.length > 0) {
-          await moduleSources.bulkWrite(
-            sources.map((s) => ({
-              insertOne: { document: s },
-            })),
-            { session }
-          );
-        }
-
-        // 5. Bulk insert for "moduleQuestions"
-        if (moduleQuestions.length > 0) {
-          await moduleQuestion.bulkWrite(
-            moduleQuestions.map((q) => ({
-              insertOne: { document: q },
-            })),
-            { session }
-          );
-        }
-
-        // 6. Bulk insert for "moduleSummaries"
-        if (moduleSummaries.length > 0) {
-          await moduleSummary.bulkWrite(
-            moduleSummaries.map((s) => ({
-              insertOne: { document: s },
-            })),
-            { session }
-          );
-        }
-
-        // 7. Bulk insert for "moduleQuestionContents"
-        if (moduleQuestionContents.length > 0) {
-          await moduleQuestionContent.bulkWrite(
-            moduleQuestionContents.map((c) => ({
-              insertOne: { document: c },
-            })),
-            { session }
-          );
-        }
-
-        // 8. Bulk insert for "subModules"
-        if (subModules.length > 0) {
-          await subModule.bulkWrite(
-            subModules.map((sm) => ({
-              insertOne: { document: sm },
-            })),
-            { session }
-          );
-        }
-
-        // 9. Bulk insert for "subModuleContents"
-        if (subModuleContents.length > 0) {
-          await subModuleContent.bulkWrite(
-            subModuleContents.map((sc) => ({
-              insertOne: { document: sc },
-            })),
-            { session }
-          );
-        }
+        await Promise.all(bulkOps);
       });
 
       session.endSession();
-
 
       res.status(201).json({
         success: true,
@@ -547,7 +348,6 @@ export const deleteFullGuide = async (req, res, next) => {
     await session.withTransaction(async () => {
       const fullGuideId = req.params.fullGuideId;
 
-      // 1️⃣ Delete main fullGuide first
       const fullGuideDelete = await fullGuideService.deleteFullGuide(
         { userId: req.user._id, _id: fullGuideId },
         { session }
@@ -557,8 +357,7 @@ export const deleteFullGuide = async (req, res, next) => {
         throw new Error("NOT_FOUND");
       }
 
-      // 2️⃣ Prepare delete tasks (parallel)
-      const deleteTasks = [
+      await Promise.all([
         module.deleteMany({ fullGuideId }, { session }),
         subModule.deleteMany({ fullGuideId }, { session }),
         moduleNote.deleteMany({ fullGuideId }, { session }),
@@ -567,10 +366,7 @@ export const deleteFullGuide = async (req, res, next) => {
         moduleSummary.deleteMany({ fullGuideId }, { session }),
         moduleSources.deleteMany({ fullGuideId }, { session }),
         subModuleContent.deleteMany({ fullGuideId }, { session }),
-      ];
-
-      // 3️⃣ Run all deletions at same time (max speed)
-      await Promise.all(deleteTasks);
+      ]);
     });
 
     session.endSession();
@@ -595,24 +391,16 @@ export const deleteFullGuide = async (req, res, next) => {
 
 export const getFullGuides = async (req, res, next) => {
   try {
-
-    // Fetch paginated guides
-    const fullGuides = await fullGuideService.getFullGuides(
-      { userId: req.user._id },
-      req.query.offset,
-      req.query.limit
-    );
-
-    // Fetch total count of guides (without pagination)
-    const totalFullGuides = await fullGuideService.countFullGuides({
-      userId: req.user._id,
-    });
+    const [fullGuides, totalFullGuides] = await Promise.all([
+      fullGuideService.getFullGuides({ userId: req.user._id }, req.query.offset, req.query.limit),
+      fullGuideService.countFullGuides({ userId: req.user._id }),
+    ]);
 
     res.status(200).json({
       success: true,
       message: "Guides fetched successfully",
-      totalFullGuides, // total available in DB
-      fullGuides, // current paginated results
+      totalFullGuides,
+      fullGuides,
     });
   } catch (err) {
     next(err);
@@ -621,25 +409,21 @@ export const getFullGuides = async (req, res, next) => {
 
 export const getFullGuide = async (req, res, next) => {
   try {
+    const fullGuide = await fullGuideService.getFullGuide({
+      userId: req.user._id,
+      _id: req.params.fullGuideId,
+    });
 
-    // Fetch paginated guides
-    const fullGuide = await fullGuideService.getFullGuide(
-      { userId: req.user._id,_id:req.params.fullGuideId }
-    );
-
-     if (!fullGuide)
-      return res.status(401).json({
-        success: false,
-        message: "full guide not found",
-      });
+    if (!fullGuide) {
+      return res.status(401).json({ success: false, message: "full guide not found" });
+    }
 
     res.status(200).json({
       success: true,
       message: "Guide fetched successfully",
-     fullGuide
+      fullGuide,
     });
   } catch (err) {
     next(err);
   }
 };
-
